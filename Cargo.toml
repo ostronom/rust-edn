@@ -1,0 +1,7 @@
+[package]
+name = "rust-edn"
+version = "0.1.0"
+authors = ["Konstantin Kirillov ostronom@gmail.com"]
+
+[lib]
+name = "edn"
