@@ -21,9 +21,10 @@ pub enum Node<'a> {
 
 pub fn to_string<'a>(node: Node<'a>) -> Result<&'a str, &'a str> {
     match node {
-        Node::Nil       => Ok("nil"),
-        Node::Bool(v)   => from_utf8(v).map_err(|_| "UTF8 decoding failure"),
-        Node::String(v) => from_utf8(v).map_err(|_| "UTF8 decoding failure"),
-        _               => Ok("UNKNOWN")
+        Node::Nil        => Ok("nil"),
+        Node::Bool(v)    => from_utf8(v).map_err(|_| "UTF8 decoding failure"),
+        Node::String(v)  => from_utf8(v).map_err(|_| "UTF8 decoding failure"),
+        //Node::Keyword(Some(ns), name) => ns.map().or("")
+        _                => { println!("{:?}", node); Err("UNKNOWN") }
     }
 }
