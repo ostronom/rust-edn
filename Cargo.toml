@@ -5,3 +5,6 @@ authors = ["Konstantin Kirillov ostronom@gmail.com"]
 
 [lib]
 name = "edn"
+
+[dev-dependencies]
+quickcheck = "0.2"

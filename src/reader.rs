@@ -54,7 +54,6 @@ fn is_whitespace(c: &u8) -> bool {
 
 fn push_lex<'a>(input: &'a [u8], start: usize, end: usize, lexeme: Lexeme, stack: &mut LinkedList<LexedNode<'a>>) {
     let z = &input[start .. end];
-    //println!("lexing {:?} as {:?}", String::from_utf8(z.to_vec()), lexeme);
     stack.push_back(LexedNode{lexeme: lexeme, value: z});
 }
 
@@ -276,12 +275,12 @@ fn handle_atom<'a>(token: &LexedNode<'a>) -> Result<Node<'a>, &'a str> {
         } else if let Some((i, f, e, p)) = parse_float(token.value, true) {
             Ok(Node::Float(i, f, e, p))
         } else {
-            println!("{}", String::from_utf8(token.value.to_owned()).unwrap());
+            println!("NO PARSE {}", String::from_utf8(token.value.to_owned()).unwrap());
             Err("Could not parse atom")
         },
         Lexeme::String => Ok(Node::String(token.value)),
         _ => {
-            println!("{}", String::from_utf8(token.value.to_owned()).unwrap());
+            println!("NO PARSE {}", String::from_utf8(token.value.to_owned()).unwrap());
             Err("Could not parse atom")
         }
     }
@@ -325,8 +324,6 @@ fn read_ahead<'a>(token: &LexedNode<'a>, tokens: &mut LinkedList<LexedNode<'a>>)
 }
 
 pub fn edn_read<'a>(s: &'a [u8]) -> Result<Node<'a>, &'a str> {
-    // Ok(Node::String("FUCK".as_bytes()))
-    // println!("{:?}", tokens);
     let mut tokens = lex(s);
     match tokens {
         Err(e) => Err(e),

@@ -54,6 +54,10 @@ impl<'a> ToString for Node<'a> {
                                                      from_utf8(ns).unwrap().to_owned(),
                                                      from_utf8(name).unwrap().to_owned()),
             Node::Keyword(None, name) => format!(":{}", from_utf8(name).unwrap().to_owned()),
+            Node::Symbol(Some(ns), name) => format!("{}/{}",
+                                                     from_utf8(ns).unwrap().to_owned(),
+                                                     from_utf8(name).unwrap().to_owned()),
+            Node::Symbol(None, name) => format!("{}", from_utf8(name).unwrap().to_owned()),
             Node::Vector(ref v) => format!("[{}]", coll_to_str(v)),
             Node::List(ref v) => format!("({})", coll_to_str(v)),
             _ => format!("{:?}", self)
