@@ -31,7 +31,23 @@ impl<'a> ToString for Node<'a> {
             Node::Bool(v) => from_utf8(v).unwrap().to_owned(),
             Node::Int(v, precision) => {
                 let vs = from_utf8(v).unwrap().to_owned();
-                if precision { format!("{}M", vs) } else { format!("{}", vs) }
+                if precision { format!("{}N", vs) } else { format!("{}", vs) }
+            },
+            Node::Float(i, f, e, p) => {
+                let is = if i.len() > 0 {
+                    from_utf8(i).unwrap().to_owned()
+                } else { String::new() };
+                let fs = if f.len() > 0 {
+                    format!(".{}", from_utf8(f).unwrap().to_owned())
+                } else { String::new() };
+                let es = if e.len() > 0 {
+                    format!("E{}", from_utf8(e).unwrap().to_owned())
+                } else { String::new() };
+                if p {
+                    format!("{}{}{}M", is, fs, es)
+                } else {
+                    format!("{}{}{}", is, fs, es)
+                }
             },
             Node::String(v)  => format!("\"{}\"",from_utf8(v).unwrap().to_owned()),
             Node::Keyword(Some(ns), name) => format!(":{}/{}",

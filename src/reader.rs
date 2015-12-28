@@ -1,4 +1,5 @@
 use ::types::*;
+use std::str::{from_utf8};
 use std::collections::{LinkedList};
 
 const ESCAPE_CHAR: u8 = 92;
@@ -210,38 +211,46 @@ fn parse_unsigned_int(s: &[u8], allow_precision: bool) -> Option<(&[u8], bool)> 
 
 fn parse_int(s: &[u8], allow_precision: bool) -> Option<(&[u8], bool)> {
     if s.len() > 0 && (s[0] == b'-' || s[0] == b'+') {
-        parse_unsigned_int(&s[1..], allow_precision)
+        match parse_unsigned_int(&s[1..], allow_precision) {
+            Some((_, p)) => Some((s, p)),
+            None => None
+        }
     } else {
         parse_unsigned_int(s, allow_precision)
     }
 }
 
-fn parse_float(s: &[u8]) -> Option<(&[u8], &[u8], &[u8], bool)> {
+fn parse_float(s: &[u8], allow_precision: bool) -> Option<(&[u8], &[u8], &[u8], bool)> {
     let len = s.len();
     if len == 0 { return None; }
     if *(s.last().unwrap()) == b'M' {
-        return parse_float(&s[..(len-1)]).map(|(x,y,z,b)| (x,y,z,true))
+        if allow_precision {
+            match parse_float(&s[..(len-1)], false) {
+                Some((x,y,z,_)) => return Some((x,y,z,true)),
+                _ => return None
+            }
+        } else { return None; }
     }
     match s.iter().position(|x| *x == b'.') {
         Some(period_position) => {
             let (integral, rest) = s.split_at(period_position);
-            let integralInt = parse_int(integral, false);
-            if integral.len() != 0 && integralInt.is_none() { return None; }
+            let integral_int = parse_int(integral, false);
+            if integral.len() != 0 && integral_int.is_none() { return None; }
             match rest[1..].iter().position(|x| *x == b'E') {
                 Some(exp_pos) if exp_pos == rest.len() => None,
                 Some(exp_pos) => {
-                    let (fraction, exponent) = rest.split_at(exp_pos);
-                    let fractionInt = parse_unsigned_int(fraction, false);
-                    let exponentInt = parse_int(&exponent[1..], false);
-                    match (integralInt, fractionInt, exponentInt) {
+                    let (fraction, exponent) = rest[1..].split_at(exp_pos);
+                    let fraction_int = parse_unsigned_int(fraction, false);
+                    let exponent_int = parse_int(&exponent[1..], false);
+                    match (integral_int, fraction_int, exponent_int) {
                         (Some((i, _)), Some((f, _)), Some((e, _))) => Some((i, f, e, false)),
                         (None, Some((f, _)), Some((e, _))) => Some((&[], f, e, false)),
                         _ => None
                     }
                 }
                 None => {
-                    let fractionInt = parse_unsigned_int(&rest[1..], false);
-                    match (integralInt, fractionInt) {
+                    let fraction_int = parse_unsigned_int(&rest[1..], false);
+                    match (integral_int, fraction_int) {
                         (Some((i, _)), Some((f, _))) => Some((i, f, &[], false)),
                         (None, Some((f, _))) => Some((&[], f, &[], false)),
                         _ => None
@@ -249,7 +258,7 @@ fn parse_float(s: &[u8]) -> Option<(&[u8], &[u8], &[u8], bool)> {
                 }
             }
         },
-        None => None
+        _ =>  None
     }
 }
 
@@ -264,13 +273,17 @@ fn handle_atom<'a>(token: &LexedNode<'a>) -> Result<Node<'a>, &'a str> {
             Ok(Node::Bool(token.value))
         } else if let Some((v, p)) = parse_int(token.value, true) {
             Ok(Node::Int(v, p))
-        } else if let Some((i, f, e, p)) = parse_float(token.value) {
+        } else if let Some((i, f, e, p)) = parse_float(token.value, true) {
             Ok(Node::Float(i, f, e, p))
         } else {
+            println!("{}", String::from_utf8(token.value.to_owned()).unwrap());
             Err("Could not parse atom")
         },
         Lexeme::String => Ok(Node::String(token.value)),
-        _ => Err("Could not parse atom")
+        _ => {
+            println!("{}", String::from_utf8(token.value.to_owned()).unwrap());
+            Err("Could not parse atom")
+        }
     }
 }
 
