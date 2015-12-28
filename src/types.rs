@@ -19,12 +19,24 @@ pub enum Node<'a> {
     Discard(Box<Node<'a>>)
 }
 
-pub fn to_string<'a>(node: Node<'a>) -> Result<&'a str, &'a str> {
-    match node {
-        Node::Nil        => Ok("nil"),
-        Node::Bool(v)    => from_utf8(v).map_err(|_| "UTF8 decoding failure"),
-        Node::String(v)  => from_utf8(v).map_err(|_| "UTF8 decoding failure"),
-        //Node::Keyword(Some(ns), name) => ns.map().or("")
-        _                => { println!("{:?}", node); Err("UNKNOWN") }
+fn coll_to_str<'a>(v: &Vec<Node<'a>>) -> String {
+    v.into_iter().map(|x| x.to_string()).collect::<Vec<String>>().join(" ")
+}
+
+impl<'a> ToString for Node<'a> {
+    // TODO: remove unwrap here
+    fn to_string(&self) -> String {
+        match *self {
+            Node::Nil => "nil".to_string(),
+            Node::Bool(v) => from_utf8(v).unwrap().to_owned(),
+            Node::String(v)  => format!("\"{}\"",from_utf8(v).unwrap().to_owned()),
+            Node::Keyword(Some(ns), name) => format!(":{}/{}",
+                                                     from_utf8(ns).unwrap().to_owned(),
+                                                     from_utf8(name).unwrap().to_owned()),
+            Node::Keyword(None, name) => format!(":{}", from_utf8(name).unwrap().to_owned()),
+            Node::Vector(ref v) => format!("[{}]", coll_to_str(v)),
+            Node::List(ref v) => format!("({})", coll_to_str(v)),
+            _ => format!("{:?}", self)
+        }
     }
 }

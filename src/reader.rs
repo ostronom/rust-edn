@@ -177,7 +177,7 @@ fn parse_symbol(s: &[u8]) -> Option<(Option<&[u8]>, &[u8])> {
         }
         l -= 1;
     }
-    Some((if slash_pos != 0 { Some(&s[0..slash_pos]) } else { None }, &s[slash_pos..]))
+    Some((if slash_pos > 0 { Some(&s[0..(slash_pos-1)]) } else { None }, &s[slash_pos..]))
 }
 
 fn parse_keyword(s: &[u8]) -> Option<(Option<&[u8]>, &[u8])> {
@@ -254,6 +254,6 @@ pub fn edn_read<'a>(s: &'a [u8]) -> Result<Node<'a>, &'a str> {
     }
 }
 
-pub fn edn_write(node: Node) -> Result<&str, &str> {
-    to_string(node)
+pub fn edn_write(node: Node) -> String {
+    node.to_string()
 }
