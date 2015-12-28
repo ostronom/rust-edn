@@ -4,11 +4,11 @@ use std::error::Error;
 #[derive(Debug)]
 pub enum Node<'a> {
     Nil,
-    Symbol(&'a [u8]),
+    Symbol(Option<&'a [u8]>, &'a[u8]), // namespace/name
     Keyword(Option<&'a [u8]>, &'a[u8]), // namespace/name
     Bool(&'a [u8]), //Bool(bool),
-    Int(&'a [u8]), //Int(i64),
-    Float(&'a [u8]), //Float(f64),
+    Int(&'a [u8], bool), //Int(i64), N-precision
+    Float(&'a [u8], &'a [u8], &'a [u8], bool), // integral, fraction, exponent, M-precision
     Char(char),
     String(&'a [u8]), //String(&'a String),
     List(Vec<Node<'a>>),
@@ -29,6 +29,10 @@ impl<'a> ToString for Node<'a> {
         match *self {
             Node::Nil => "nil".to_string(),
             Node::Bool(v) => from_utf8(v).unwrap().to_owned(),
+            Node::Int(v, precision) => {
+                let vs = from_utf8(v).unwrap().to_owned();
+                if precision { format!("{}M", vs) } else { format!("{}", vs) }
+            },
             Node::String(v)  => format!("\"{}\"",from_utf8(v).unwrap().to_owned()),
             Node::Keyword(Some(ns), name) => format!(":{}/{}",
                                                      from_utf8(ns).unwrap().to_owned(),

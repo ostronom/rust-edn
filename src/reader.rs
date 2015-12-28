@@ -155,6 +155,7 @@ fn handle_tagged<'a>(token: &'a LexedNode, next: &'a LexedNode) -> Node<'a> {
     Node::Tagged(&token.value, &next.value)
 }
 
+// TODO: use .split_at to split namespace/name
 fn parse_symbol(s: &[u8]) -> Option<(Option<&[u8]>, &[u8])> {
     let mut l: usize = s.len();
     let mut slash_pos: usize = 0;
@@ -189,15 +190,84 @@ fn valid_bool(s: &[u8]) -> bool {
     s == [b't', b'r', b'u', b'e'] || s == [b'f', b'a', b'l', b's', b'e']
 }
 
+fn parse_unsigned_int(s: &[u8], allow_precision: bool) -> Option<(&[u8], bool)> {
+    let len = s.len();
+    let last = s.last();
+    if len == 0 { return None }
+    if *(s.last().unwrap()) == b'N' {
+        if allow_precision {
+            return parse_unsigned_int(&s[..(len-1)], false).map(|(x,y)| (x, true))
+        } else {
+            return None
+        }
+    }
+    if s.into_iter().all(|x| is_digit(*x)) {
+        Some((s, false))
+    } else {
+        None
+    }
+}
+
+fn parse_int(s: &[u8], allow_precision: bool) -> Option<(&[u8], bool)> {
+    if s.len() > 0 && (s[0] == b'-' || s[0] == b'+') {
+        parse_unsigned_int(&s[1..], allow_precision)
+    } else {
+        parse_unsigned_int(s, allow_precision)
+    }
+}
+
+fn parse_float(s: &[u8]) -> Option<(&[u8], &[u8], &[u8], bool)> {
+    let len = s.len();
+    if len == 0 { return None; }
+    if *(s.last().unwrap()) == b'M' {
+        return parse_float(&s[..(len-1)]).map(|(x,y,z,b)| (x,y,z,true))
+    }
+    match s.iter().position(|x| *x == b'.') {
+        Some(period_position) => {
+            let (integral, rest) = s.split_at(period_position);
+            let integralInt = parse_int(integral, false);
+            if integral.len() != 0 && integralInt.is_none() { return None; }
+            match rest[1..].iter().position(|x| *x == b'E') {
+                Some(exp_pos) if exp_pos == rest.len() => None,
+                Some(exp_pos) => {
+                    let (fraction, exponent) = rest.split_at(exp_pos);
+                    let fractionInt = parse_unsigned_int(fraction, false);
+                    let exponentInt = parse_unsigned_int(&exponent[1..], false);
+                    match (integralInt, fractionInt, exponentInt) {
+                        (Some((i, _)), Some((f, _)), Some((e, _))) => Some((i, f, e, false)),
+                        (None, Some((f, _)), Some((e, _))) => Some((&[], f, e, false)),
+                        _ => None
+                    }
+                }
+                None => {
+                    let fractionInt = parse_unsigned_int(&rest[1..], false);
+                    match (integralInt, fractionInt) {
+                        (Some((i, _)), Some((f, _))) => Some((i, f, &[], false)),
+                        (None, Some((f, _))) => Some((&[], f, &[], false)),
+                        _ => None
+                    }
+                }
+            }
+        },
+        None => None
+    }
+}
+
 fn handle_atom<'a>(token: &LexedNode<'a>) -> Result<Node<'a>, &'a str> {
     match token.lexeme {
         Lexeme::Atom if token.value == &[b'n',b'i',b'l'] => Ok(Node::Nil),
         Lexeme::Atom => if let Some((ns, name)) = parse_keyword(token.value) {
             Ok(Node::Keyword(ns, name))
+        } else if let Some((ns, name)) = parse_symbol(token.value) {
+            Ok(Node::Symbol(ns, name))
         } else if valid_bool(token.value) {
             Ok(Node::Bool(token.value))
+        } else if let Some((v, p)) = parse_int(token.value, true) {
+            Ok(Node::Int(v, p))
+        } else if let Some((i, f, e, p)) = parse_float(token.value) {
+            Ok(Node::Float(i, f, e, p))
         } else {
-            Ok(Node::Nil)
+            Err("Could not parse atom")
         },
         Lexeme::String => Ok(Node::String(token.value)),
         _ => Err("Could not parse atom")
