@@ -232,7 +232,7 @@ fn parse_float(s: &[u8]) -> Option<(&[u8], &[u8], &[u8], bool)> {
                 Some(exp_pos) => {
                     let (fraction, exponent) = rest.split_at(exp_pos);
                     let fractionInt = parse_unsigned_int(fraction, false);
-                    let exponentInt = parse_unsigned_int(&exponent[1..], false);
+                    let exponentInt = parse_int(&exponent[1..], false);
                     match (integralInt, fractionInt, exponentInt) {
                         (Some((i, _)), Some((f, _)), Some((e, _))) => Some((i, f, e, false)),
                         (None, Some((f, _)), Some((e, _))) => Some((&[], f, e, false)),
