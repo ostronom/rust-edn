@@ -15,6 +15,7 @@ pub enum Node<'a> {
     Vector(Vec<Node<'a>>),
     Map, // ??
     Set(Vec<Node<'a>>),
+    Comment(&'a [u8]),
     Tagged(&'a [u8], &'a [u8]), // tagName/tagValue
     Discard(Box<Node<'a>>)
 }

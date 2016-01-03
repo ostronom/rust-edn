@@ -5,11 +5,12 @@ use std::collections::{LinkedList};
 const ESCAPE_CHAR: u8 = 92;
 
 #[derive(Debug, PartialEq)]
-enum Lexeme { String, Atom, VecParen, MapParen, ListParen }
+enum Lexeme { String, Atom, VecParen, MapParen, ListParen, Comment }
 
 #[derive(Debug)]
 struct LexedNode<'a> {
     lexeme: Lexeme,
+    pos: usize,
     value: &'a [u8]
 }
 
@@ -54,7 +55,7 @@ fn is_whitespace(c: &u8) -> bool {
 
 fn push_lex<'a>(input: &'a [u8], start: usize, end: usize, lexeme: Lexeme, stack: &mut LinkedList<LexedNode<'a>>) {
     let z = &input[start .. end];
-    stack.push_back(LexedNode{lexeme: lexeme, value: z});
+    stack.push_back(LexedNode{lexeme: lexeme, pos: start, value: z});
 }
 
 fn lex<'a>(s: &'a [u8]) -> Result<LinkedList<LexedNode<'a>>, &str> {
@@ -65,19 +66,24 @@ fn lex<'a>(s: &'a [u8]) -> Result<LinkedList<LexedNode<'a>>, &str> {
     let mut token: usize = 0;
     let mut pos: usize = 0;
     for c in s {
-        if !in_string && *c == b';' && !escaping { in_comment = true; }
+        if !in_string && !in_comment && *c == b';' && !escaping {
+            if token != pos {
+                push_lex(s, token, pos, Lexeme::Atom, &mut tokens);
+            }
+            token = pos;
+            in_comment = true
+        }
         if in_comment {
             if *c == b'\n' {
                 in_comment = false;
                 if token != pos {
-                    push_lex(s, token, pos, Lexeme::Atom, &mut tokens);
-                    token = pos;
+                    push_lex(s, token, pos+1, Lexeme::Comment, &mut tokens);
+                    token = pos + 1;
                 }
-                pos += 1;
-                continue;
             }
+            pos += 1;
+            continue;
         }
-
         if *c == b'"' && !escaping {
             if in_string {
                 push_lex(s, token, pos, Lexeme::String, &mut tokens);
@@ -117,21 +123,20 @@ fn lex<'a>(s: &'a [u8]) -> Result<LinkedList<LexedNode<'a>>, &str> {
                 }
             }
             token += 1;
-            // if is_whitespace(c) { token += 1; }
+            if is_whitespace(c) { escaping = false };
         } else {
-            if escaping { escaping = false; }
-            else if *c == ESCAPE_CHAR { escaping = true; }
-
+            // if escaping { escaping = false; }
+            // else if *c == ESCAPE_CHAR { escaping = true; }
             // if token == "#_" || (token.len() == 2 && token.as_bytes()[0] == ESCAPE_CHAR) {
             //     tokens.push_back(LexedNode{lexeme: Lexeme::Atom, value: token.clone()});
             //     token.clear();
             // }
 
-            let diff = pos - token;
-            if (diff > 0 && s[token .. pos] == [b'#', b'_']) || (diff == 2 && s[token] == ESCAPE_CHAR) {
-                push_lex(s, token, pos, Lexeme::Atom, &mut tokens);
-                token = pos;
-            }
+            // let diff = pos - token;
+            // if (diff > 0 && s[token .. pos] == [b'#', b'_']) || (diff >= 2 && s[token] == ESCAPE_CHAR) {
+            //     push_lex(s, token, pos, Lexeme::Atom, &mut tokens);
+            //     token = pos;
+            // }
         }
         pos += 1;
     }
@@ -261,6 +266,29 @@ fn parse_float(s: &[u8], allow_precision: bool) -> Option<(&[u8], &[u8], &[u8], 
     }
 }
 
+fn parse_char(s: &[u8]) -> Option<char> {
+    if s.len() < 2 || s[0] != b'\\' { return None };
+    match from_utf8(&s[1..]) {
+        Ok("newline")         => Some('\n'),
+        Ok("return")          => Some('\r'),
+        Ok("space")           => Some(' '),
+        Ok("tab")             => Some('\t'),
+        Ok(s) if s.len() == 1 => Some(s.chars().nth(0).unwrap()),
+        _                     => None
+    }
+    // match ch {
+    //     &NEWLINE_CHAR => Some('\n'),
+    //     &C_CHAR       => Some('c'),
+    //     &RETURN_CHAR  => Some('\r'),
+    //     &SPACE_CHAR   => Some(' '),
+    //     &TAB_CHAR     => Some('\t'),
+    //     _            => match from_utf8(ch) {
+    //         Ok(v) if v.len() == 1 => Some(v.chars().nth(0).unwrap()),
+    //         _ => None
+    //     }
+    // }
+}
+
 fn handle_atom<'a>(token: &LexedNode<'a>) -> Result<Node<'a>, &'a str> {
     match token.lexeme {
         Lexeme::Atom if token.value == &[b'n',b'i',b'l'] => Ok(Node::Nil),
@@ -274,14 +302,17 @@ fn handle_atom<'a>(token: &LexedNode<'a>) -> Result<Node<'a>, &'a str> {
             Ok(Node::Int(v, p))
         } else if let Some((i, f, e, p)) = parse_float(token.value, true) {
             Ok(Node::Float(i, f, e, p))
+        } else if let Some(ch) = parse_char(token.value) {
+            Ok(Node::Char(ch))
         } else {
-            println!("NO PARSE {}", String::from_utf8(token.value.to_owned()).unwrap());
+            println!("NO PARSE {:?} {} at {}", token.lexeme, String::from_utf8(token.value.to_owned()).unwrap(), token.pos);
             Err("Could not parse atom")
         },
         Lexeme::String => Ok(Node::String(token.value)),
+        Lexeme::Comment => Ok(Node::Comment(token.value)),
         _ => {
             println!("NO PARSE {}", String::from_utf8(token.value.to_owned()).unwrap());
-            Err("Could not parse atom")
+            Err("Could not parse value")
         }
     }
 }
